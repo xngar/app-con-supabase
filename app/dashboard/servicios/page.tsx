@@ -22,6 +22,7 @@ import {
   Calendar,
   Lock,
   LogIn,
+  Shield,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -30,6 +31,7 @@ export default function ServiciosPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
+  const [dbUser, setDbUser] = useState<Usuario | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,14 @@ export default function ServiciosPage() {
 
       setCategorias(cats);
       setUsuarios(users);
+
+      // Find db user matching current logged in auth user
+      if (user?.email) {
+        const found = users.find((u) => u.email?.toLowerCase() === user.email?.toLowerCase());
+        setDbUser(found || null);
+      } else {
+        setDbUser(null);
+      }
 
       const mappedServicios: Servicio[] = (servData || []).map((s) => {
         const cat = cats.find((c) => String(c.id) === String(s.categoria_id));
@@ -183,7 +193,8 @@ export default function ServiciosPage() {
 
   const openCreateModal = () => {
     setFormCategoriaId(categorias[0]?.id ? String(categorias[0].id) : "");
-    setFormUsuarioId(usuarios[0]?.id ? String(usuarios[0].id) : "");
+    // Default to current logged-in user ID
+    setFormUsuarioId(dbUser?.id ? String(dbUser.id) : (usuarios[0]?.id ? String(usuarios[0].id) : ""));
     setActionError(null);
     setIsCreateOpen(true);
   };
@@ -219,12 +230,12 @@ export default function ServiciosPage() {
   return (
     <div className="space-y-6">
       {/* Guest Mode Banner */}
-      {!currentUser && (
+      {!currentUser ? (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-600 dark:text-amber-400 text-sm">
           <div className="flex items-center gap-2.5">
             <Lock className="h-4 w-4 shrink-0" />
             <span>
-              <strong>Modo de solo lectura:</strong> Estás visualizando los servicios públicos. Inicia sesión para vincular, modificar o eliminar registros.
+              <strong>Modo de solo lectura:</strong> Estás visualizando los servicios públicos. Inicia sesión para registrar o administrar tus servicios.
             </span>
           </div>
           <Button asChild size="sm" className="rounded-xl shrink-0 shadow-sm">
@@ -232,6 +243,13 @@ export default function ServiciosPage() {
               <LogIn className="mr-1.5 h-3.5 w-3.5" /> Iniciar Sesión
             </Link>
           </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-xs text-emerald-600 dark:text-emerald-400">
+          <Shield className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>Control por Propietario Activo:</strong> Puedes crear servicios y editar o borrar únicamente los servicios vinculados a tu cuenta (<strong>{currentUser.email}</strong>).
+          </span>
         </div>
       )}
 
@@ -247,8 +265,7 @@ export default function ServiciosPage() {
             </h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Visualiza, vincula, edita y administra los registros de la tabla{" "}
-            <code className="text-primary bg-muted px-1.5 py-0.5 rounded text-xs font-mono">servicios</code>
+            Visualiza, vincula y administra los servicios registrados en la base de datos
           </p>
         </div>
 
@@ -264,7 +281,6 @@ export default function ServiciosPage() {
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
 
-          {/* Show 'Nuevo Servicio' ONLY if authenticated */}
           {currentUser && (
             <Button
               onClick={openCreateModal}
@@ -348,94 +364,117 @@ export default function ServiciosPage() {
                   <th className="px-6 py-4">Categoría Asignada</th>
                   <th className="px-6 py-4">Usuario Responsable</th>
                   <th className="px-6 py-4">Fecha Creación</th>
-                  {/* Show column 'Acciones' ONLY when authenticated */}
                   {currentUser && (
                     <th className="px-6 py-4 text-right">Acciones</th>
                   )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {filteredServicios.map((serv) => (
-                  <tr
-                    key={serv.id}
-                    className="hover:bg-accent/40 transition-colors group"
-                  >
-                    <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
-                      {serv.id}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-                          <FolderTree className="h-3.5 w-3.5" />
-                        </span>
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {serv.categorias?.nombre_categoria || `ID: ${serv.categoria_id}`}
-                          </p>
-                          {serv.categorias?.nombre_categoria && (
-                            <p className="text-[11px] font-mono text-muted-foreground">
-                              Cat ID: {serv.categoria_id}
+                {filteredServicios.map((serv) => {
+                  // Ownership check: Is this service owned by the logged-in user?
+                  const isOwner =
+                    currentUser &&
+                    (
+                      (dbUser && String(serv.usuario_id) === String(dbUser.id)) ||
+                      (serv.usuarios?.email && serv.usuarios.email.toLowerCase() === currentUser.email?.toLowerCase())
+                    );
+
+                  return (
+                    <tr
+                      key={serv.id}
+                      className="hover:bg-accent/40 transition-colors group"
+                    >
+                      <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
+                        {serv.id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+                            <FolderTree className="h-3.5 w-3.5" />
+                          </span>
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {serv.categorias?.nombre_categoria || `ID: ${serv.categoria_id}`}
                             </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-500 font-bold text-xs uppercase">
-                          {serv.usuarios?.nombre?.charAt(0) || <User className="h-3.5 w-3.5" />}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {serv.usuarios?.nombre || "Usuario"}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {serv.usuarios?.email || `User ID: ${serv.usuario_id}`}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {serv.created_at
-                          ? new Date(serv.created_at).toLocaleDateString("es-ES", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "—"}
-                      </div>
-                    </td>
-                    {/* Render action buttons ONLY when authenticated */}
-                    {currentUser && (
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(serv)}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg"
-                            title="Editar"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDeleteModal(serv)}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            {serv.categorias?.nombre_categoria && (
+                              <p className="text-[11px] font-mono text-muted-foreground">
+                                Cat ID: {serv.categoria_id}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-500 font-bold text-xs uppercase">
+                            {serv.usuarios?.nombre?.charAt(0) || <User className="h-3.5 w-3.5" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-foreground">
+                                {serv.usuarios?.nombre || "Usuario"}
+                              </p>
+                              {isOwner && (
+                                <span className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium px-1.5 py-0.2 rounded-md">
+                                  Tuyo
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {serv.usuarios?.email || `User ID: ${serv.usuario_id}`}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {serv.created_at
+                            ? new Date(serv.created_at).toLocaleDateString("es-ES", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </div>
+                      </td>
+
+                      {/* Action buttons: ONLY shown if the user is the OWNER */}
+                      {currentUser && (
+                        <td className="px-6 py-4 text-right">
+                          {isOwner ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditModal(serv)}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg"
+                                title="Editar mi servicio"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteModal(serv)}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                title="Eliminar mi servicio"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50 italic">
+                              Solo lectura
+                            </span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -448,7 +487,7 @@ export default function ServiciosPage() {
           isOpen={isCreateOpen}
           onClose={() => !isSubmitting && setIsCreateOpen(false)}
           title="Crear Nuevo Servicio"
-          description="Selecciona la categoría y el usuario para vincular el servicio"
+          description="Selecciona la categoría para registrar tu servicio"
         >
           <form onSubmit={handleCreate} className="space-y-4">
             {actionError && (
@@ -489,8 +528,13 @@ export default function ServiciosPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-usuario">Usuario</Label>
-              {usuarios.length > 0 ? (
+              <Label htmlFor="create-usuario">Usuario Responsable (Tú)</Label>
+              {dbUser ? (
+                <div className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground flex items-center justify-between">
+                  <span>{dbUser.nombre} ({dbUser.email})</span>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-mono">ID: {dbUser.id}</span>
+                </div>
+              ) : (
                 <select
                   id="create-usuario"
                   value={formUsuarioId}
@@ -499,22 +543,12 @@ export default function ServiciosPage() {
                   disabled={isSubmitting}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="" disabled>Selecciona un usuario</option>
                   {usuarios.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.nombre} - {u.email}
                     </option>
                   ))}
                 </select>
-              ) : (
-                <Input
-                  id="create-usuario"
-                  placeholder="Ingresa usuario_id (ej. 21 o UUID)"
-                  value={formUsuarioId}
-                  onChange={(e) => setFormUsuarioId(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                />
               )}
             </div>
 
@@ -580,35 +614,6 @@ export default function ServiciosPage() {
                   placeholder="categoria_id"
                   value={formCategoriaId}
                   onChange={(e) => setFormCategoriaId(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                />
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-usuario">Usuario</Label>
-              {usuarios.length > 0 ? (
-                <select
-                  id="edit-usuario"
-                  value={formUsuarioId}
-                  onChange={(e) => setFormUsuarioId(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nombre} - {u.email}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  id="edit-usuario"
-                  placeholder="usuario_id"
-                  value={formUsuarioId}
-                  onChange={(e) => setFormUsuarioId(e.target.value)}
                   required
                   disabled={isSubmitting}
                 />

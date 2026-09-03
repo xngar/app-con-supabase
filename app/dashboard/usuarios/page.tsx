@@ -10,7 +10,6 @@ import { Modal } from "@/components/ui/modal";
 import Link from "next/link";
 import {
   Users,
-  Plus,
   Search,
   Edit2,
   Trash2,
@@ -24,6 +23,7 @@ import {
   Lock,
   LogIn,
   Hash,
+  Shield,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -35,7 +35,6 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Modal states
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
@@ -74,38 +73,6 @@ export default function UsuariosPage() {
   useEffect(() => {
     fetchUsuarios();
   }, [fetchUsuarios]);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formNombre.trim() || !formEmail.trim()) return;
-
-    setIsSubmitting(true);
-    setActionError(null);
-
-    try {
-      const { error: insertError } = await supabase.from("usuarios").insert([
-        {
-          nombre: formNombre.trim(),
-          edad: formEdad ? parseInt(formEdad, 10) : 18,
-          email: formEmail.trim(),
-          image_url: formImageUrl.trim() || "",
-        },
-      ]);
-
-      if (insertError) throw insertError;
-
-      setFormNombre("");
-      setFormEdad("18");
-      setFormEmail("");
-      setFormImageUrl("");
-      setIsCreateOpen(false);
-      await fetchUsuarios();
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : "Error al registrar el usuario");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,15 +132,6 @@ export default function UsuariosPage() {
     }
   };
 
-  const openCreateModal = () => {
-    setFormNombre("");
-    setFormEdad("18");
-    setFormEmail("");
-    setFormImageUrl("");
-    setActionError(null);
-    setIsCreateOpen(true);
-  };
-
   const openEditModal = (usr: Usuario) => {
     setSelectedUsuario(usr);
     setFormNombre(usr.nombre || "");
@@ -201,12 +159,12 @@ export default function UsuariosPage() {
   return (
     <div className="space-y-6">
       {/* Guest Mode Banner */}
-      {!currentUser && (
+      {!currentUser ? (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-600 dark:text-amber-400 text-sm">
           <div className="flex items-center gap-2.5">
             <Lock className="h-4 w-4 shrink-0" />
             <span>
-              <strong>Modo de solo lectura:</strong> Estás visualizando los usuarios en modo invitado. Inicia sesión para administrar perfiles.
+              <strong>Modo de solo lectura:</strong> Estás visualizando los usuarios en modo invitado. Inicia sesión para administrar tu perfil.
             </span>
           </div>
           <Button asChild size="sm" className="rounded-xl shrink-0 shadow-sm">
@@ -214,6 +172,13 @@ export default function UsuariosPage() {
               <LogIn className="mr-1.5 h-3.5 w-3.5" /> Iniciar Sesión
             </Link>
           </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-2xl border border-purple-500/20 bg-purple-500/10 p-3.5 text-xs text-purple-600 dark:text-purple-400">
+          <Shield className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>Control de Privacidad:</strong> Cada usuario registrado puede editar únicamente su propio perfil (<strong>{currentUser.email}</strong>).
+          </span>
         </div>
       )}
 
@@ -229,8 +194,7 @@ export default function UsuariosPage() {
             </h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Visualiza, crea, edita y administra los registros de la tabla{" "}
-            <code className="text-primary bg-muted px-1.5 py-0.5 rounded text-xs font-mono">usuarios</code>
+            Visualiza los perfiles de usuario registrados en la plataforma
           </p>
         </div>
 
@@ -245,18 +209,6 @@ export default function UsuariosPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
-
-          {/* Show 'Nuevo Usuario' ONLY if authenticated */}
-          {currentUser && (
-            <Button
-              onClick={openCreateModal}
-              className="rounded-xl shadow-md"
-              size="sm"
-            >
-              <Plus className="mr-1.5 h-4 w-4" />
-              Nuevo Usuario
-            </Button>
-          )}
         </div>
       </div>
 
@@ -311,15 +263,6 @@ export default function UsuariosPage() {
                 ? `No hay resultados que coincidan con "${searchTerm}".`
                 : "Aún no hay usuarios agregados en la base de datos."}
             </p>
-            {!searchTerm && currentUser && (
-              <Button
-                onClick={openCreateModal}
-                size="sm"
-                className="mt-4 rounded-xl"
-              >
-                <Plus className="mr-1.5 h-4 w-4" /> Agregar primer usuario
-              </Button>
-            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -330,203 +273,113 @@ export default function UsuariosPage() {
                   <th className="px-6 py-4">Usuario / Nombre</th>
                   <th className="px-6 py-4">Edad</th>
                   <th className="px-6 py-4">Correo Electrónico</th>
-                  {/* Show column 'Acciones' ONLY when authenticated */}
                   {currentUser && (
                     <th className="px-6 py-4 text-right">Acciones</th>
                   )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {filteredUsuarios.map((usr) => (
-                  <tr
-                    key={usr.id}
-                    className="hover:bg-accent/40 transition-colors group"
-                  >
-                    <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
-                      {usr.id}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {usr.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={usr.image_url}
-                            alt={usr.nombre || "Avatar"}
-                            className="h-9 w-9 rounded-full object-cover border border-border"
-                          />
-                        ) : (
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-500/10 text-purple-500 font-bold text-xs uppercase border border-purple-500/20">
-                            {usr.nombre?.charAt(0) || <UserIcon className="h-4 w-4" />}
+                {filteredUsuarios.map((usr) => {
+                  const isOwner =
+                    currentUser?.email &&
+                    usr.email?.toLowerCase() === currentUser.email.toLowerCase();
+
+                  return (
+                    <tr
+                      key={usr.id}
+                      className="hover:bg-accent/40 transition-colors group"
+                    >
+                      <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
+                        {usr.id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {usr.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={usr.image_url}
+                              alt={usr.nombre || "Avatar"}
+                              className="h-9 w-9 rounded-full object-cover border border-border"
+                            />
+                          ) : (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-500/10 text-purple-500 font-bold text-xs uppercase border border-purple-500/20">
+                              {usr.nombre?.charAt(0) || <UserIcon className="h-4 w-4" />}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-foreground">
+                                {usr.nombre || "(Sin nombre)"}
+                              </p>
+                              {isOwner && (
+                                <span className="text-[10px] bg-purple-500/15 text-purple-600 dark:text-purple-400 font-medium px-1.5 py-0.2 rounded-md">
+                                  Tú
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground md:hidden">
+                              {usr.email}
+                            </p>
                           </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {usr.nombre || "(Sin nombre)"}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground md:hidden">
-                            {usr.email}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-medium text-foreground">
-                      {usr.edad ? `${usr.edad} años` : "—"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        <span>{usr.email || "—"}</span>
-                      </div>
-                    </td>
-                    {/* Render action buttons ONLY when authenticated */}
-                    {currentUser && (
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(usr)}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg"
-                            title="Editar"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDeleteModal(usr)}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-6 py-4 text-xs font-medium text-foreground">
+                        {usr.edad ? `${usr.edad} años` : "—"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Mail className="h-3.5 w-3.5 text-muted-foreground/70" />
+                          <span>{usr.email || "—"}</span>
+                        </div>
+                      </td>
+
+                      {/* Action buttons: ONLY for the logged-in user's own profile */}
+                      {currentUser && (
+                        <td className="px-6 py-4 text-right">
+                          {isOwner ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditModal(usr)}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg"
+                                title="Editar mi perfil"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteModal(usr)}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                                title="Eliminar mi cuenta"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50 italic">
+                              Solo lectura
+                            </span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Modal: Crear Usuario */}
-      {currentUser && (
-        <Modal
-          isOpen={isCreateOpen}
-          onClose={() => !isSubmitting && setIsCreateOpen(false)}
-          title="Crear Nuevo Usuario"
-          description="Ingresa los datos para registrar un usuario en la tabla 'usuarios'"
-        >
-          <form onSubmit={handleCreate} className="space-y-4">
-            {actionError && (
-              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{actionError}</span>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="create-user-nombre">Nombre Completo</Label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="create-user-nombre"
-                  placeholder="Ej. María García"
-                  value={formNombre}
-                  onChange={(e) => setFormNombre(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  className="pl-9"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="create-user-edad">Edad</Label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="create-user-edad"
-                    type="number"
-                    min="1"
-                    max="120"
-                    placeholder="18"
-                    value={formEdad}
-                    onChange={(e) => setFormEdad(e.target.value)}
-                    disabled={isSubmitting}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="create-user-email">Correo Electrónico</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="create-user-email"
-                    type="email"
-                    placeholder="maria@ejemplo.com"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    required
-                    disabled={isSubmitting}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="create-user-image">URL de Imagen / Avatar (Opcional)</Label>
-              <div className="relative">
-                <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="create-user-image"
-                  type="url"
-                  placeholder="https://ejemplo.com/avatar.jpg"
-                  value={formImageUrl}
-                  onChange={(e) => setFormImageUrl(e.target.value)}
-                  disabled={isSubmitting}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsCreateOpen(false)}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...
-                  </>
-                ) : (
-                  "Guardar Usuario"
-                )}
-              </Button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
       {/* Modal: Editar Usuario */}
       {currentUser && (
         <Modal
           isOpen={isEditOpen}
           onClose={() => !isSubmitting && setIsEditOpen(false)}
-          title="Editar Usuario"
-          description={`Modificando registro ID: ${selectedUsuario?.id}`}
+          title="Editar Mi Perfil"
+          description={`Modificando tu cuenta ID: ${selectedUsuario?.id}`}
         >
           <form onSubmit={handleEdit} className="space-y-4">
             {actionError && (
@@ -634,8 +487,8 @@ export default function UsuariosPage() {
         <Modal
           isOpen={isDeleteOpen}
           onClose={() => !isSubmitting && setIsDeleteOpen(false)}
-          title="¿Eliminar Usuario?"
-          description="Esta acción eliminará el registro de la tabla de usuarios de Supabase."
+          title="¿Eliminar Mi Cuenta?"
+          description="Esta acción eliminará tu registro de usuario de la base de datos."
           maxWidth="sm"
         >
           <div className="space-y-4">
