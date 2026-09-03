@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState } from "react";
-import { Loader2, Mail, KeyRound, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Mail, KeyRound, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
 
 export function ForgotPasswordForm({
   className,
@@ -27,21 +27,31 @@ export function ForgotPasswordForm({
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) return;
+
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
+      const redirectUrl = `${window.location.origin}/auth/callback?next=/auth/update-password`;
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
-          redirectTo: `${window.location.origin}/auth/update-password`,
+          redirectTo: redirectUrl,
         }
       );
-      if (resetError) throw resetError;
+
+      if (resetError) {
+        if (resetError.message.includes("rate limit")) {
+          throw new Error("Has realizado demasiadas solicitudes seguidas. Por favor espera unos minutos antes de reintentar.");
+        }
+        throw resetError;
+      }
+
       setSuccess(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error al enviar el correo");
+      setError(err instanceof Error ? err.message : "Ocurrió un error al enviar el correo de recuperación");
     } finally {
       setIsLoading(false);
     }
@@ -63,12 +73,25 @@ export function ForgotPasswordForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Haz clic en el enlace del correo para configurar una nueva contraseña.
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Haz clic en el enlace que te enviamos al correo electrónico. Serás redirigido a la página para ingresar tu nueva contraseña.
             </p>
-            <Button asChild className="w-full">
-              <Link href="/auth/login">Volver al inicio de sesión</Link>
-            </Button>
+            <div className="pt-2 flex flex-col gap-2">
+              <Button asChild className="w-full">
+                <Link href="/auth/login">Volver al inicio de sesión</Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSuccess(false);
+                  setError(null);
+                }}
+                className="text-xs text-muted-foreground"
+              >
+                ¿No recibiste el correo? Reintentar
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -102,12 +125,13 @@ export function ForgotPasswordForm({
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@ejemplo.com"
+                    placeholder="tu@correo.com"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-9"
                     disabled={isLoading}
+                    autoFocus
                   />
                 </div>
               </div>
@@ -128,12 +152,11 @@ export function ForgotPasswordForm({
               </Button>
 
               <div className="pt-2 text-center text-sm text-muted-foreground">
-                ¿Recordaste tu contraseña?{" "}
                 <Link
                   href="/auth/login"
-                  className="font-medium text-primary underline underline-offset-4 hover:opacity-80"
+                  className="inline-flex items-center gap-1.5 font-medium text-primary underline underline-offset-4 hover:opacity-80 text-xs"
                 >
-                  Inicia sesión aquí
+                  <ArrowLeft className="h-3.5 w-3.5" /> Volver al inicio de sesión
                 </Link>
               </div>
             </form>
