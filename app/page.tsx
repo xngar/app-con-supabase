@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+import { MainNavbar } from "@/components/main-navbar";
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -36,24 +38,8 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen flex flex-col bg-background text-foreground selection:bg-primary/20">
-      {/* Top Navbar */}
-      <nav className="w-full flex justify-center border-b border-border/60 bg-background/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="w-full max-w-6xl flex justify-between items-center p-4 px-6 text-sm">
-          <div className="flex gap-3 items-center font-bold tracking-tight text-base">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-              <Database className="h-5 w-5" />
-            </div>
-            <span>App con Supabase</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <ThemeSwitcher />
-            <Suspense fallback={<div className="h-9 w-24 bg-muted animate-pulse rounded-xl" />}>
-              <AuthButton />
-            </Suspense>
-          </div>
-        </div>
-      </nav>
+      {/* Top Main Navbar Responsive */}
+      <MainNavbar user={user} />
 
       {/* Hero Section */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto px-6 py-12 text-center space-y-8">

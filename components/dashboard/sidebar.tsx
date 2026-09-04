@@ -11,6 +11,7 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -57,19 +58,31 @@ export function Sidebar({ onNavClick, className }: SidebarProps) {
       )}
     >
       {/* Brand Header */}
-      <div className="flex h-16 items-center gap-3 px-6 border-b border-border/60">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-          <Database className="h-5 w-5" />
+      <div className="flex h-16 items-center justify-between px-6 border-b border-border/60">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+            <Database className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight tracking-tight">
+              Supabase Hub
+            </h1>
+            <p className="text-[11px] font-medium text-emerald-500 flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Conectado
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-base font-bold leading-tight tracking-tight">
-            Supabase Hub
-          </h1>
-          <p className="text-[11px] font-medium text-emerald-500 flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Conectado
-          </p>
-        </div>
+
+        {onNavClick && (
+          <button
+            onClick={onNavClick}
+            className="md:hidden rounded-xl p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation Links */}
