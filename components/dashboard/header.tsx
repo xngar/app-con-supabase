@@ -49,45 +49,45 @@ export function Header({ user, onMenuToggle, isMobileMenuOpen }: HeaderProps) {
     null;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border/60 bg-background/80 px-4 sm:px-6 backdrop-blur-md">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border/60 bg-background/80 px-3 sm:px-6 backdrop-blur-md min-w-0 max-w-full overflow-hidden">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Mobile menu button */}
         <button
           onClick={onMenuToggle}
-          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden shrink-0"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 truncate">
           <Link
             href="/"
-            className="text-xs text-muted-foreground hover:text-foreground hidden sm:inline-flex items-center gap-1"
+            className="text-xs text-muted-foreground hover:text-foreground hidden sm:inline-flex items-center gap-1 shrink-0"
           >
             Inicio <ExternalLink className="h-3 w-3" />
           </Link>
           <span className="text-muted-foreground hidden sm:inline">/</span>
-          <span className="text-sm font-semibold text-foreground">Dashboard</span>
+          <span className="text-sm font-semibold text-foreground truncate">Dashboard</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <ThemeSwitcher />
 
         {user ? (
           /* Logged-in user profile */
-          <div className="flex items-center gap-3 pl-2 border-l border-border/60">
-            <div className="hidden text-right md:block">
-              <p className="text-xs font-semibold text-foreground leading-tight">
+          <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-border/60 min-w-0">
+            <div className="hidden text-right md:block truncate max-w-[140px]">
+              <p className="text-xs font-semibold text-foreground leading-tight truncate">
                 {displayName}
               </p>
-              <p className="text-[11px] text-muted-foreground leading-tight">
+              <p className="text-[11px] text-muted-foreground leading-tight truncate">
                 {user.email}
               </p>
             </div>
 
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs uppercase border border-primary/20">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs uppercase border border-primary/20 shrink-0">
               {displayName?.charAt(0) || <UserIcon className="h-4 w-4" />}
             </div>
 
@@ -96,7 +96,7 @@ export function Header({ user, onMenuToggle, isMobileMenuOpen }: HeaderProps) {
               size="sm"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors p-2 sm:px-3"
               title="Cerrar sesión"
             >
               {isLoggingOut ? (

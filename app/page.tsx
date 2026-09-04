@@ -217,11 +217,11 @@ export default async function Home() {
         </div>
 
         {/* Supabase status badge */}
-        <div className="inline-flex items-center gap-2 rounded-2xl border border-border/50 bg-secondary/30 px-4 py-2 text-xs text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 text-emerald-500" />
+        <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/50 bg-secondary/30 px-4 py-2 text-xs text-muted-foreground break-all">
+          <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
           <span>Proyecto ID:</span>
-          <code className="font-mono font-semibold text-foreground">bzqgnfhmegbekzwhnbha</code>
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          <code className="font-mono font-semibold text-foreground break-all">bzqgnfhmegbekzwhnbha</code>
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
         </div>
       </div>
 
