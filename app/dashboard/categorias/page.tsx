@@ -79,9 +79,15 @@ export default function CategoriasPage() {
     setActionError(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Debes iniciar sesión para crear una categoría");
+      }
+
       const { error: insertError } = await supabase.from("categorias").insert([
         {
           nombre_categoria: formNombre.trim(),
+          user_id: user.id,
         },
       ]);
 

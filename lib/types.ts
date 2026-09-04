@@ -1,5 +1,6 @@
 export interface Categoria {
   id: string | number;
+  user_id?: string;
   nombre_categoria: string;
   created_at?: string;
 }
