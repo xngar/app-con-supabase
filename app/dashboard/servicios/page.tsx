@@ -58,13 +58,17 @@ export default function ServiciosPage() {
       setCurrentUser(user);
 
       // Fetch servicios, categorias, and usuarios
+      const catQuery = user
+        ? supabase.from("categorias").select("*").eq("user_id", user.id)
+        : supabase.from("categorias").select("*");
+
       const [
         { data: servData, error: servError },
         { data: catData },
         { data: userData },
       ] = await Promise.all([
         supabase.from("servicios").select("*").order("id", { ascending: true }),
-        supabase.from("categorias").select("*"),
+        catQuery,
         supabase.from("usuarios").select("*"),
       ]);
 

@@ -20,13 +20,17 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const catQuery = user
+    ? supabase.from("categorias").select("*", { count: "exact", head: true }).eq("user_id", user.id)
+    : supabase.from("categorias").select("*", { count: "exact", head: true });
+
   // Fetch counts from all three tables
   const [
     { count: catCount },
     { count: servCount },
     { count: userCount },
   ] = await Promise.all([
-    supabase.from("categorias").select("*", { count: "exact", head: true }),
+    catQuery,
     supabase.from("servicios").select("*", { count: "exact", head: true }),
     supabase.from("usuarios").select("*", { count: "exact", head: true }),
   ]);

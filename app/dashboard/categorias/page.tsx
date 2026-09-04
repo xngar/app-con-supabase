@@ -53,9 +53,15 @@ export default function CategoriasPage() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
+      if (!user) {
+        setCategorias([]);
+        return;
+      }
+
       const { data, error: catError } = await supabase
         .from("categorias")
         .select("*")
+        .eq("user_id", user.id)
         .order("id", { ascending: true });
 
       if (catError) throw catError;
@@ -111,12 +117,16 @@ export default function CategoriasPage() {
     setActionError(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesión no válida");
+
       const { error: updateError } = await supabase
         .from("categorias")
         .update({
           nombre_categoria: formNombre.trim(),
         })
-        .eq("id", selectedCategoria.id);
+        .eq("id", selectedCategoria.id)
+        .eq("user_id", user.id);
 
       if (updateError) throw updateError;
 
@@ -138,10 +148,14 @@ export default function CategoriasPage() {
     setActionError(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesión no válida");
+
       const { error: deleteError } = await supabase
         .from("categorias")
         .delete()
-        .eq("id", selectedCategoria.id);
+        .eq("id", selectedCategoria.id)
+        .eq("user_id", user.id);
 
       if (deleteError) throw deleteError;
 
