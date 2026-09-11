@@ -24,13 +24,28 @@ import {
   LogIn,
   Hash,
   Shield,
+  CheckCircle2,
+  XCircle,
+  Activity,
+  Check,
+  X,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+
+// Helper to determine if user is active from the joined table
+export function isUsuarioActivo(usr: Usuario): boolean {
+  if (!usr.operativo) return true; // default to true if no row exists yet
+  if (Array.isArray(usr.operativo)) {
+    return usr.operativo.length > 0 ? (usr.operativo[0]?.activo ?? true) : true;
+  }
+  return usr.operativo.activo ?? true;
+}
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +59,7 @@ export default function UsuariosPage() {
   const [formEdad, setFormEdad] = useState<string>("18");
   const [formEmail, setFormEmail] = useState("");
   const [formImageUrl, setFormImageUrl] = useState("");
+  const [formActivo, setFormActivo] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -56,9 +72,10 @@ export default function UsuariosPage() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
+      // Fetch usuarios with joined operativo table
       const { data, error: usrError } = await supabase
         .from("usuarios")
-        .select("*")
+        .select("*, operativo(*)")
         .order("id", { ascending: true });
 
       if (usrError) throw usrError;
@@ -82,6 +99,7 @@ export default function UsuariosPage() {
     setActionError(null);
 
     try {
+      // 1. Update personal details in 'usuarios' table
       const { error: updateError } = await supabase
         .from("usuarios")
         .update({
@@ -94,12 +112,27 @@ export default function UsuariosPage() {
 
       if (updateError) throw updateError;
 
+      // 2. Save active / inactive status in 'operativo' table
+      const { error: opError } = await supabase
+        .from("operativo")
+        .upsert(
+          {
+            usuario_id: selectedUsuario.id,
+            activo: formActivo,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "usuario_id" }
+        );
+
+      if (opError) throw opError;
+
       setIsEditOpen(false);
       setSelectedUsuario(null);
       setFormNombre("");
       setFormEdad("18");
       setFormEmail("");
       setFormImageUrl("");
+      setFormActivo(true);
       await fetchUsuarios();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Error al actualizar el usuario");
@@ -138,6 +171,7 @@ export default function UsuariosPage() {
     setFormEdad(usr.edad ? String(usr.edad) : "18");
     setFormEmail(usr.email || "");
     setFormImageUrl(usr.image_url || "");
+    setFormActivo(isUsuarioActivo(usr));
     setActionError(null);
     setIsEditOpen(true);
   };
@@ -153,8 +187,19 @@ export default function UsuariosPage() {
     const name = (u.nombre || "").toLowerCase();
     const email = (u.email || "").toLowerCase();
     const id = String(u.id).toLowerCase();
-    return name.includes(search) || email.includes(search) || id.includes(search);
+    const matchesSearch = name.includes(search) || email.includes(search) || id.includes(search);
+
+    const active = isUsuarioActivo(u);
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && active) ||
+      (statusFilter === "inactive" && !active);
+
+    return matchesSearch && matchesStatus;
   });
+
+  const activeCount = usuarios.filter((u) => isUsuarioActivo(u)).length;
+  const inactiveCount = usuarios.length - activeCount;
 
   return (
     <div className="space-y-6">
@@ -164,7 +209,7 @@ export default function UsuariosPage() {
           <div className="flex items-center gap-2.5">
             <Lock className="h-4 w-4 shrink-0" />
             <span>
-              <strong>Modo de solo lectura:</strong> Estás visualizando los usuarios en modo invitado. Inicia sesión para administrar tu perfil.
+              <strong>Modo de solo lectura:</strong> Estás visualizando los usuarios en modo invitado. Inicia sesión para administrar tu perfil y estado operativo.
             </span>
           </div>
           <Button asChild size="sm" className="rounded-xl shrink-0 shadow-sm">
@@ -177,7 +222,7 @@ export default function UsuariosPage() {
         <div className="flex items-center gap-2 rounded-2xl border border-purple-500/20 bg-purple-500/10 p-3.5 text-xs text-purple-600 dark:text-purple-400">
           <Shield className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Control de Privacidad:</strong> Cada usuario registrado puede editar únicamente su propio perfil (<strong>{currentUser.email}</strong>).
+            <strong>Control de Privacidad:</strong> Cada usuario registrado puede editar únicamente su propio perfil y estado operativo (<strong>{currentUser.email}</strong>).
           </span>
         </div>
       )}
@@ -194,7 +239,7 @@ export default function UsuariosPage() {
             </h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Visualiza los perfiles de usuario registrados en la plataforma
+            Visualiza los perfiles de usuario y su estado operativo en la plataforma
           </p>
         </div>
 
@@ -213,17 +258,59 @@ export default function UsuariosPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row items-center gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, email o ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 rounded-xl"
-          />
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre, email o ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 rounded-xl"
+            />
+          </div>
+
+          {/* Status Filter Buttons */}
+          <div className="flex items-center p-1 bg-muted/60 rounded-xl border border-border/60 text-xs">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                statusFilter === "all"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Todos ({usuarios.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("active")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+                statusFilter === "active"
+                  ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+              Activos ({activeCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("inactive")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
+                statusFilter === "inactive"
+                  ? "bg-background text-rose-600 dark:text-rose-400 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+              No Activos ({inactiveCount})
+            </button>
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground ml-auto">
+
+        <div className="text-xs text-muted-foreground sm:text-right">
           Mostrando <strong>{filteredUsuarios.length}</strong> de{" "}
           <strong>{usuarios.length}</strong> registros
         </div>
@@ -256,11 +343,13 @@ export default function UsuariosPage() {
               <UserPlus className="h-6 w-6" />
             </div>
             <h3 className="text-base font-semibold text-foreground">
-              {searchTerm ? "No se encontraron coincidencias" : "No hay usuarios registrados en la tabla"}
+              {searchTerm || statusFilter !== "all"
+                ? "No se encontraron coincidencias"
+                : "No hay usuarios registrados en la tabla"}
             </h3>
             <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-              {searchTerm
-                ? `No hay resultados que coincidan con "${searchTerm}".`
+              {searchTerm || statusFilter !== "all"
+                ? "Prueba cambiando los términos de búsqueda o los filtros de estado."
                 : "Aún no hay usuarios agregados en la base de datos."}
             </p>
           </div>
@@ -271,6 +360,7 @@ export default function UsuariosPage() {
                 <tr>
                   <th className="px-6 py-4">ID</th>
                   <th className="px-6 py-4">Usuario / Nombre</th>
+                  <th className="px-6 py-4">Estado Operativo</th>
                   <th className="px-6 py-4">Edad</th>
                   <th className="px-6 py-4">Correo Electrónico</th>
                   {currentUser && (
@@ -283,6 +373,7 @@ export default function UsuariosPage() {
                   const isOwner =
                     currentUser?.email &&
                     usr.email?.toLowerCase() === currentUser.email.toLowerCase();
+                  const activo = isUsuarioActivo(usr);
 
                   return (
                     <tr
@@ -323,6 +414,27 @@ export default function UsuariosPage() {
                           </div>
                         </div>
                       </td>
+
+                      {/* Estado Operativo Badge */}
+                      <td className="px-6 py-4">
+                        {activo ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Activo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25">
+                            <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+                            <XCircle className="h-3.5 w-3.5" />
+                            No Activo
+                          </span>
+                        )}
+                      </td>
+
                       <td className="px-6 py-4 text-xs font-medium text-foreground">
                         {usr.edad ? `${usr.edad} años` : "—"}
                       </td>
@@ -343,7 +455,7 @@ export default function UsuariosPage() {
                                 size="sm"
                                 onClick={() => openEditModal(usr)}
                                 className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg"
-                                title="Editar mi perfil"
+                                title="Editar mi perfil y estado"
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -373,13 +485,13 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {/* Modal: Editar Usuario */}
+      {/* Modal: Editar Usuario y Estado Operativo */}
       {currentUser && (
         <Modal
           isOpen={isEditOpen}
           onClose={() => !isSubmitting && setIsEditOpen(false)}
           title="Editar Mi Perfil"
-          description={`Modificando tu cuenta ID: ${selectedUsuario?.id}`}
+          description={`Modificando datos y estado operativo del usuario ID: ${selectedUsuario?.id}`}
         >
           <form onSubmit={handleEdit} className="space-y-4">
             {actionError && (
@@ -388,6 +500,79 @@ export default function UsuariosPage() {
                 <span>{actionError}</span>
               </div>
             )}
+
+            {/* Selector de Estado Operativo (Tabla operativo) */}
+            <div className="space-y-2 rounded-2xl border border-border/80 bg-muted/30 p-3.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5 text-primary" />
+                  Estado Operativo (Tabla `operativo`)
+                </Label>
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                    formActivo
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                      : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                  }`}
+                >
+                  {formActivo ? "ACTIVO" : "NO ACTIVO"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setFormActivo(true)}
+                  disabled={isSubmitting}
+                  className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                    formActivo
+                      ? "border-emerald-500/60 bg-emerald-500/10 text-foreground ring-2 ring-emerald-500/20"
+                      : "border-border/60 bg-background/50 text-muted-foreground hover:bg-accent/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Activo
+                    </span>
+                    {formActivo && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px]">
+                        <Check className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Habilitado para operar en la plataforma.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormActivo(false)}
+                  disabled={isSubmitting}
+                  className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                    !formActivo
+                      ? "border-rose-500/60 bg-rose-500/10 text-foreground ring-2 ring-rose-500/20"
+                      : "border-border/60 bg-background/50 text-muted-foreground hover:bg-accent/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">
+                      <XCircle className="h-4 w-4" />
+                      No Activo
+                    </span>
+                    {!formActivo && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white text-[10px]">
+                        <Check className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Pausado o no disponible temporalmente.
+                  </span>
+                </button>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="edit-user-nombre">Nombre Completo</Label>
@@ -471,10 +656,10 @@ export default function UsuariosPage() {
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Actualizando...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...
                   </>
                 ) : (
-                  "Actualizar Cambios"
+                  "Guardar Cambios"
                 )}
               </Button>
             </div>

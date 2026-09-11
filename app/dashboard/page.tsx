@@ -189,7 +189,7 @@ export default async function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3 text-sm">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <div className="rounded-xl border border-border/40 bg-secondary/20 p-4">
             <p className="text-xs text-muted-foreground font-medium">Tabla</p>
             <p className="font-bold text-foreground mt-0.5">categorias</p>
@@ -210,7 +210,15 @@ export default async function DashboardPage() {
             <p className="text-xs text-muted-foreground font-medium">Tabla</p>
             <p className="font-bold text-foreground mt-0.5">usuarios</p>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Columnas: <code className="text-primary">id, nombre, email, image_url</code>
+              Columnas: <code className="text-primary">id, nombre, email, edad, image_url</code>
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border/40 bg-secondary/20 p-4">
+            <p className="text-xs text-muted-foreground font-medium">Tabla</p>
+            <p className="font-bold text-foreground mt-0.5">operativo</p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Columnas: <code className="text-primary">id, usuario_id, activo, updated_at</code>
             </p>
           </div>
         </div>

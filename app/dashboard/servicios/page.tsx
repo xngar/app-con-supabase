@@ -69,7 +69,7 @@ export default function ServiciosPage() {
       ] = await Promise.all([
         supabase.from("servicios").select("*").order("id", { ascending: true }),
         catQuery,
-        supabase.from("usuarios").select("*"),
+        supabase.from("usuarios").select("*, operativo(*)"),
       ]);
 
       if (servError) throw servError;

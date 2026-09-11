@@ -12,6 +12,16 @@ export interface Usuario {
   email: string;
   created_at?: string;
   image_url?: string | null;
+  operativo?: Operativo | Operativo[] | null;
+}
+
+export interface Operativo {
+  id: string | number;
+  usuario_id: string | number;
+  activo: boolean;
+  created_at?: string;
+  updated_at?: string;
+  usuarios?: Usuario | null;
 }
 
 export interface Servicio {
@@ -23,3 +33,4 @@ export interface Servicio {
   categorias?: Categoria | null;
   usuarios?: Usuario | null;
 }
+
